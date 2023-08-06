@@ -6,10 +6,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.content.res.Resources
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
+import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,17 +21,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
@@ -36,6 +44,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 
 class MainActivity : ComponentActivity() {
 
@@ -126,15 +136,59 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun IntroPage(onStartQuiz: () -> Unit) {
-        Column(
-            modifier = Modifier.fillMaxSize(), // makes sure the column takes up all available space
-            verticalArrangement = Arrangement.Center, // centers the items vertically
-            horizontalAlignment = Alignment.CenterHorizontally // centers the items horizontally
-        ) {
-            Text(text = "QUIZ", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(32.dp))
-            Button(onClick = { onStartQuiz() }) {
-                Text("Start Quiz")
+        val context = LocalContext.current
+
+        val backgroundVideoView = remember { VideoView(context) }
+        val buttonTextureVideoView = remember { VideoView(context) }
+
+        // Setting up background video
+        DisposableEffect(Unit) {
+            backgroundVideoView.setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.intro_video}"))
+            backgroundVideoView.setOnPreparedListener { mediaPlayer ->
+                mediaPlayer.isLooping = true
+                mediaPlayer.start()
+            }
+
+            onDispose {
+                backgroundVideoView.stopPlayback()
+            }
+        }
+
+        // Setting up button texture video
+        DisposableEffect(Unit) {
+            buttonTextureVideoView.setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.patterns}"))
+            buttonTextureVideoView.setOnPreparedListener { mediaPlayer ->
+                mediaPlayer.isLooping = true
+                mediaPlayer.start()
+            }
+
+            onDispose {
+                buttonTextureVideoView.stopPlayback()
+            }
+        }
+
+        val buttonWidth = 200.dp
+        val buttonHeight = 60.dp
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Background VideoView
+            AndroidView({ backgroundVideoView }, Modifier.fillMaxSize())
+
+            // Centered Box for button video texture and button
+            Box(
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                // Button Texture VideoView
+                AndroidView({ buttonTextureVideoView }, Modifier.size(buttonWidth, buttonHeight).align(Alignment.Center))
+
+                // Actual Button with transparent background
+                Button(
+                    onClick = onStartQuiz,
+                    modifier = Modifier.size(buttonWidth, buttonHeight).align(Alignment.Center).background(Color.Transparent),
+                    colors = ButtonDefaults.buttonColors(Color.Transparent)
+                ) {
+                    Text("Start Quiz")
+                }
             }
         }
     }
