@@ -89,8 +89,10 @@ class MainActivity : ComponentActivity() {
                     val offsetValue = (screenHeight / 4).dp
                     Snackbar(
                         modifier = Modifier.align(Alignment.BottomCenter)  // Align to bottom center
-                            .offset(y = -offsetValue), // Move upwards by the offset
-                        action = {
+                            .offset(y = -offsetValue) // Move upwards by the offset
+                        .padding(horizontal = 32.dp),  // Add horizontal padding
+
+                    action = {
                             TextButton(onClick = { snackbarState.value = null }) {
                                 Text("DISMISS")
                             }
