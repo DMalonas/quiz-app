@@ -1,5 +1,10 @@
 package com.example.quiz
 
+import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import android.content.res.Resources
 import android.os.Bundle
 import android.widget.Toast
@@ -84,9 +89,13 @@ class MainActivity : ComponentActivity() {
 
 
     @Composable
-    fun DisplayQuestions(questions: List<QuestionData>, currentRound: MutableState<Int>, score: MutableState<Int>, onQuizFinished: () -> Unit) {
+    fun DisplayQuestions(
+        questions: List<QuestionData>,
+        currentRound: MutableState<Int>,
+        score: MutableState<Int>,
+        onQuizFinished: () -> Unit
+    ) {
         val context = LocalContext.current
-
         val currentQuestionIndex = remember { mutableStateOf(0) }
 
         if (currentQuestionIndex.value < questions.size) {
@@ -94,22 +103,14 @@ class MainActivity : ComponentActivity() {
             when (questionData.type) {
                 QuestionType.RADIO -> RadioButtonQuestionWrapper(
                     data = questionData,
-                    onAnsweredCorrectly = {
-                        score.value += 1
-                        currentQuestionIndex.value += 1
-                    },
-                    onAnsweredIncorrectly = {
-                        currentQuestionIndex.value += 1
+                    onAnswered = { isCorrect ->
+                        handleAnswer(isCorrect, score, currentQuestionIndex, context)
                     }
                 )
                 QuestionType.CHECKBOX -> CheckboxQuestionWrapper(
                     data = questionData,
-                    onAnsweredCorrectly = {
-                        score.value += 1
-                        currentQuestionIndex.value += 1
-                    },
-                    onAnsweredIncorrectly = {
-                        currentQuestionIndex.value += 1
+                    onAnswered = { isCorrect ->
+                        handleAnswer(isCorrect, score, currentQuestionIndex, context)
                     }
                 )
             }
@@ -123,12 +124,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun handleAnswer(
+        isCorrect: Boolean,
+        score: MutableState<Int>,
+        currentQuestionIndex: MutableState<Int>,
+        context: Context
+    ) {
+        val feedbackMessage = if (isCorrect) {
+            score.value += 1
+            "Correct!"
+        } else {
+            "Wrong answer. Try again."
+        }
+        Toast.makeText(context, feedbackMessage, Toast.LENGTH_SHORT).show()
+        CoroutineScope(Dispatchers.Main).launch {
+            delay(1000)  // 1 second delay
+            currentQuestionIndex.value += 1
+        }
+    }
+
 
     @Composable
     fun RadioButtonQuestionWrapper(
         data: QuestionData,
-        onAnsweredCorrectly: () -> Unit,
-        onAnsweredIncorrectly: () -> Unit
+        onAnswered: (Boolean) -> Unit
     ) {
         val question = stringResource(id = data.questionResId)
         val options = stringArrayResource(id = data.optionsResId).toList()
@@ -141,13 +160,8 @@ class MainActivity : ComponentActivity() {
             options = options,
             correctAnswers = correctAnswers,
             onSubmission = { isCorrect ->
-                if (isCorrect) {
-                    Toast.makeText(context, "Correct!", Toast.LENGTH_SHORT).show()
-                    onAnsweredCorrectly()
-                } else {
-                    Toast.makeText(context, "Wrong answer. Try again.", Toast.LENGTH_SHORT).show()
-                    onAnsweredIncorrectly()
-                }
+                Toast.makeText(context, if (isCorrect) "Correct!" else "Wrong answer. Try again.", Toast.LENGTH_SHORT).show()
+                onAnswered(isCorrect)
             },
             selectedOption = selectedOption
         )
@@ -156,8 +170,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun CheckboxQuestionWrapper(
         data: QuestionData,
-        onAnsweredCorrectly: () -> Unit,
-        onAnsweredIncorrectly: () -> Unit
+        onAnswered: (Boolean) -> Unit
     ) {
         val question = stringResource(id = data.questionResId)
         val options = stringArrayResource(id = data.optionsResId).toList()
@@ -171,13 +184,8 @@ class MainActivity : ComponentActivity() {
             options = options,
             correctAnswers = correctAnswers,
             onSubmission = { isCorrect ->
-                if (isCorrect) {
-                    Toast.makeText(context, "Correct!", Toast.LENGTH_SHORT).show()
-                    onAnsweredCorrectly()
-                } else {
-                    Toast.makeText(context, "Wrong answers. Try again.", Toast.LENGTH_SHORT).show()
-                    onAnsweredIncorrectly()
-                }
+                Toast.makeText(context, if (isCorrect) "Correct!" else "Wrong answers. Try again.", Toast.LENGTH_SHORT).show()
+                onAnswered(isCorrect)
             },
             selectedOptions = selectedOptions
         )
