@@ -5,25 +5,33 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            val showIntroPage = remember { mutableStateOf(true) }
             val currentRound = remember { mutableStateOf(1) }
             val score = remember { mutableStateOf(0) }
             val resources = LocalContext.current.resources
@@ -40,30 +48,43 @@ class MainActivity : ComponentActivity() {
             }
 
             questionIds.recycle() // Remember to recycle the typed array
-
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                DisplayQuestions(questions = questionsData, currentRound = currentRound, score = score)
+            if (showIntroPage.value) {
+                IntroPage(onStartQuiz = {
+                    showIntroPage.value = false
+                })
+            } else {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    DisplayQuestions(questions = questionsData, currentRound = currentRound, score = score, onQuizFinished = {
+                        showIntroPage.value = true
+                    })
+                }
             }
         }
     }
 
 
-    fun getQuestionDataFromResources(
-        type: QuestionType,
-        questionResId: Int,
-        optionsResId: Int,
-        correctAnswersResId: Int,
-        resources: Resources
-    ): QuestionData {
-        val correctAnswers = resources.getStringArray(correctAnswersResId).toList()
-        return QuestionData(type, questionResId, optionsResId, correctAnswers)
+    @Composable
+    fun IntroPage(onStartQuiz: () -> Unit) {
+        Column(
+            modifier = Modifier.fillMaxSize(), // makes sure the column takes up all available space
+            verticalArrangement = Arrangement.Center, // centers the items vertically
+            horizontalAlignment = Alignment.CenterHorizontally // centers the items horizontally
+        ) {
+            Text(text = "QUIZ", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(32.dp))
+            Button(onClick = { onStartQuiz() }) {
+                Text("Start Quiz")
+            }
+        }
     }
 
 
+
+
     @Composable
-    fun DisplayQuestions(questions: List<QuestionData>, currentRound: MutableState<Int>, score: MutableState<Int>) {
+    fun DisplayQuestions(questions: List<QuestionData>, currentRound: MutableState<Int>, score: MutableState<Int>, onQuizFinished: () -> Unit) {
         val context = LocalContext.current
 
         val currentQuestionIndex = remember { mutableStateOf(0) }
@@ -98,6 +119,7 @@ class MainActivity : ComponentActivity() {
             currentRound.value += 1
             currentQuestionIndex.value = 0
             Toast.makeText(context, "Round finished!", Toast.LENGTH_SHORT).show()
+            onQuizFinished()
         }
     }
 
@@ -159,5 +181,16 @@ class MainActivity : ComponentActivity() {
             },
             selectedOptions = selectedOptions
         )
+    }
+
+    fun getQuestionDataFromResources(
+        type: QuestionType,
+        questionResId: Int,
+        optionsResId: Int,
+        correctAnswersResId: Int,
+        resources: Resources
+    ): QuestionData {
+        val correctAnswers = resources.getStringArray(correctAnswersResId).toList()
+        return QuestionData(type, questionResId, optionsResId, correctAnswers)
     }
 }
