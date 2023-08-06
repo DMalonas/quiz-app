@@ -11,19 +11,25 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
@@ -36,6 +42,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            val snackbarState = remember { mutableStateOf<SnackbarData?>(null) }
             val showIntroPage = remember { mutableStateOf(true) }
             val currentRound = remember { mutableStateOf(1) }
             val score = remember { mutableStateOf(0) }
@@ -53,21 +60,66 @@ class MainActivity : ComponentActivity() {
             }
 
             questionIds.recycle() // Remember to recycle the typed array
-            if (showIntroPage.value) {
-                IntroPage(onStartQuiz = {
-                    showIntroPage.value = false
-                })
-            } else {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    DisplayQuestions(questions = questionsData, currentRound = currentRound, score = score, onQuizFinished = {
-                        showIntroPage.value = true
+            Box(modifier = Modifier.fillMaxSize()) { // Add the Box here
+
+                if (showIntroPage.value) {
+                    IntroPage(onStartQuiz = {
+                        showIntroPage.value = false
                     })
+                } else {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        DisplayQuestions(
+                            questions = questionsData,
+                            currentRound = currentRound,
+                            score = score,
+                            onQuizFinished = {
+                                showIntroPage.value = true
+                            },
+                            snackbarState = snackbarState
+                        )
+                    }
+                }
+
+
+                snackbarState.value?.let { snackbarData ->
+                    // Snackbar display
+                    val screenHeight = LocalConfiguration.current.screenHeightDp
+                    val offsetValue = (screenHeight / 4).dp
+                    Snackbar(
+                        modifier = Modifier.align(Alignment.BottomCenter)  // Align to bottom center
+                            .offset(y = -offsetValue), // Move upwards by the offset
+                        action = {
+                            TextButton(onClick = { snackbarState.value = null }) {
+                                Text("DISMISS")
+                            }
+                        },
+                        actionOnNewLine = false
+                    ) {
+                        Text(snackbarData.message)
+                    }
+                    // Set a delay to auto-dismiss the Snackbar after a certain duration
+                    CoroutineScope(Dispatchers.Main).launch {
+                        val delayDuration = snackbarData.duration.toMillis()
+                        if (snackbarData.duration != SnackbarDuration.Indefinite) {
+                            delay(delayDuration)
+                            snackbarState.value = null
+                        }
+                    }
                 }
             }
         }
     }
+
+    fun SnackbarDuration.toMillis(): Long {
+        return when (this) {
+            SnackbarDuration.Short -> 1500L
+            SnackbarDuration.Long -> 2750L
+            SnackbarDuration.Indefinite -> Long.MAX_VALUE // Represents an indefinitely long duration.
+        }
+    }
+
 
 
     @Composable
@@ -93,7 +145,8 @@ class MainActivity : ComponentActivity() {
         questions: List<QuestionData>,
         currentRound: MutableState<Int>,
         score: MutableState<Int>,
-        onQuizFinished: () -> Unit
+        onQuizFinished: () -> Unit,
+        snackbarState: MutableState<SnackbarData?>  // Passed state to use in the function
     ) {
         val context = LocalContext.current
         val currentQuestionIndex = remember { mutableStateOf(0) }
@@ -104,13 +157,13 @@ class MainActivity : ComponentActivity() {
                 QuestionType.RADIO -> RadioButtonQuestionWrapper(
                     data = questionData,
                     onAnswered = { isCorrect ->
-                        handleAnswer(isCorrect, score, currentQuestionIndex, context)
+                        handleAnswer(isCorrect, score, currentQuestionIndex, context, snackbarState)
                     }
                 )
                 QuestionType.CHECKBOX -> CheckboxQuestionWrapper(
                     data = questionData,
                     onAnswered = { isCorrect ->
-                        handleAnswer(isCorrect, score, currentQuestionIndex, context)
+                        handleAnswer(isCorrect, score, currentQuestionIndex, context, snackbarState)
                     }
                 )
             }
@@ -119,7 +172,7 @@ class MainActivity : ComponentActivity() {
             // Round finished, reset questions and increase round number.
             currentRound.value += 1
             currentQuestionIndex.value = 0
-            Toast.makeText(context, "Round finished!", Toast.LENGTH_SHORT).show()
+            snackbarState.value = SnackbarData(message = "Round finished!")
             onQuizFinished()
         }
     }
@@ -128,7 +181,8 @@ class MainActivity : ComponentActivity() {
         isCorrect: Boolean,
         score: MutableState<Int>,
         currentQuestionIndex: MutableState<Int>,
-        context: Context
+        context: Context,
+        snackbarState: MutableState<SnackbarData?>  // Passed state to use in the function
     ) {
         val feedbackMessage = if (isCorrect) {
             score.value += 1
@@ -136,7 +190,8 @@ class MainActivity : ComponentActivity() {
         } else {
             "Wrong answer. Try again."
         }
-        Toast.makeText(context, feedbackMessage, Toast.LENGTH_SHORT).show()
+        snackbarState.value = SnackbarData(message = feedbackMessage, SnackbarDuration.Short)
+
         CoroutineScope(Dispatchers.Main).launch {
             delay(1000)  // 1 second delay
             currentQuestionIndex.value += 1
@@ -160,7 +215,6 @@ class MainActivity : ComponentActivity() {
             options = options,
             correctAnswers = correctAnswers,
             onSubmission = { isCorrect ->
-                Toast.makeText(context, if (isCorrect) "Correct!" else "Wrong answer. Try again.", Toast.LENGTH_SHORT).show()
                 onAnswered(isCorrect)
             },
             selectedOption = selectedOption
@@ -184,7 +238,6 @@ class MainActivity : ComponentActivity() {
             options = options,
             correctAnswers = correctAnswers,
             onSubmission = { isCorrect ->
-                Toast.makeText(context, if (isCorrect) "Correct!" else "Wrong answers. Try again.", Toast.LENGTH_SHORT).show()
                 onAnswered(isCorrect)
             },
             selectedOptions = selectedOptions

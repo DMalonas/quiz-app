@@ -1,5 +1,7 @@
 package com.example.quiz
 
+import androidx.compose.material3.SnackbarDuration
+
 enum class QuestionType {
     RADIO, CHECKBOX
 }
@@ -12,3 +14,8 @@ data class QuestionData(
 )
 
 data class RoundScore(val correct: Int, val total: Int)
+
+
+
+
+data class SnackbarData(val message: String, val duration: SnackbarDuration = SnackbarDuration.Short)
