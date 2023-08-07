@@ -18,21 +18,21 @@ import androidx.compose.ui.unit.dp
 fun RadioButtonQuestionTemplate(
     question: String,
     options: List<String>,
-    correctAnswers: List<String>, // Updated to accept a list
+    correctAnswers: List<Int>, // Updated to accept a list of Int
     onSubmission: (Boolean) -> Unit,
-    selectedOption: MutableState<String?>
+    selectedOption: MutableState<Int?> // Updated to Int?
 ) {
     Column {
         Text(text = question)
-        options.forEach { option ->
+        options.forEachIndexed { index, option -> // Use forEachIndexed to get index as well
             Row(
                 Modifier.selectable(
-                    selected = (option == selectedOption.value),
-                    onClick = { selectedOption.value = option }
+                    selected = (index == selectedOption.value),
+                    onClick = { selectedOption.value = index }
                 )
             ) {
                 RadioButton(
-                    selected = (option == selectedOption.value),
+                    selected = (index == selectedOption.value),
                     onClick = null
                 )
                 Text(text = option)
@@ -40,7 +40,7 @@ fun RadioButtonQuestionTemplate(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = {
-            // Check if the selected option matches the correct answer
+            // Check if the selected option index matches the correct answer
             onSubmission(selectedOption.value == correctAnswers.sorted().first())
         }) {
             Text("Submit")
@@ -53,27 +53,27 @@ fun RadioButtonQuestionTemplate(
 fun CheckboxQuestionTemplate(
     question: String,
     options: List<String>,
-    correctAnswers: List<String>, // New parameter for correct answers
-    onSubmission: (Boolean) -> Unit, // New parameter to handle submission result
-    selectedOptions: MutableState<List<String>>
+    correctAnswers: List<Int>, // Updated to accept a list of Int
+    onSubmission: (Boolean) -> Unit,
+    selectedOptions: MutableState<List<Int>>
 ) {
     Column {
         Text(text = question)
-        options.forEach { option ->
+        options.forEachIndexed { index, option ->
             Row(
                 Modifier.selectable(
-                    selected = selectedOptions.value.contains(option),
+                    selected = selectedOptions.value.contains(index),
                     onClick = {
-                        if (selectedOptions.value.contains(option)) {
-                            selectedOptions.value = selectedOptions.value - option
+                        if (selectedOptions.value.contains(index)) {
+                            selectedOptions.value = selectedOptions.value - listOf(index)
                         } else {
-                            selectedOptions.value = selectedOptions.value + option
+                            selectedOptions.value = selectedOptions.value + listOf(index)
                         }
                     }
                 )
             ) {
                 Checkbox(
-                    checked = selectedOptions.value.contains(option),
+                    checked = selectedOptions.value.contains(index),
                     onCheckedChange = null
                 )
                 Text(text = option)

@@ -299,14 +299,15 @@ class MainActivity : ComponentActivity() {
     ) {
         val question = data.question
         val options = data.choices
-        val correctAnswers = data.correctAnswers
-        val selectedOption = remember { mutableStateOf<String?>(null) }
-//        val context = LocalContext.current
+        val correctAnswersInt = data.correctAnswers.map { it.toInt() }
+
+        // Use data.id as a unique key for the state
+        val selectedOption = remember(data.choices + data.question) { mutableStateOf<Int?>(null) }
 
         RadioButtonQuestionTemplate(
             question = question,
             options = options,
-            correctAnswers = correctAnswers,
+            correctAnswers = correctAnswersInt,
             onSubmission = { isCorrect ->
                 onAnswered(isCorrect)
             },
@@ -321,19 +322,17 @@ class MainActivity : ComponentActivity() {
     ) {
         val question = data.question
         val options = data.choices
-        val correctAnswers = data.correctAnswers
-
-        val selectedOptions = remember { mutableStateOf<List<String>>(emptyList()) }
-//        val context = LocalContext.current
-
+        val correctAnswersInt = data.correctAnswers.map { it.toInt() } // Convert to list of integers
+        // Using data.question as a key for remember
+            val selectedOptionsIndices = remember(data.choices + data.question) { mutableStateOf<List<Int>>(emptyList()) }
         CheckboxQuestionTemplate(
             question = question,
             options = options,
-            correctAnswers = correctAnswers,
+            correctAnswers = correctAnswersInt,
             onSubmission = { isCorrect ->
                 onAnswered(isCorrect)
             },
-            selectedOptions = selectedOptions
+            selectedOptions = selectedOptionsIndices
         )
     }
 }
