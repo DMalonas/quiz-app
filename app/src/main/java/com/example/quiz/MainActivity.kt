@@ -8,12 +8,10 @@ import kotlinx.coroutines.launch
 import android.content.res.Resources
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
 import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -30,22 +28,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.zIndex
+import kotlinx.coroutines.withContext
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class MainActivity : ComponentActivity() {
 
@@ -56,20 +55,59 @@ class MainActivity : ComponentActivity() {
             val showIntroPage = remember { mutableStateOf(true) }
             val currentRound = remember { mutableStateOf(1) }
             val score = remember { mutableStateOf(0) }
-            val resources = LocalContext.current.resources
+//            val resources = LocalContext.current.resources
             // Fetch the list of questions
-            val questionIds = resources.obtainTypedArray(R.array.questions_list)
-            val questionsData = mutableListOf<QuestionData>()
+//            val questionIds = resources.obtainTypedArray(R.array.questions_list)
+//            val questionsData = mutableListOf<QuestionData>()
             // Dynamically create QuestionData for each question
-            for (i in 0 until questionIds.length()) {
-                val questionResId = questionIds.getResourceId(i, 0)
-                val optionsResId = resources.getIdentifier("question_${i+1}_options", "array", packageName)
-                val answersResId = resources.getIdentifier("question_${i+1}_answers", "array", packageName)
-                val type = if (resources.getStringArray(answersResId).size > 1) QuestionType.CHECKBOX else QuestionType.RADIO
-                questionsData.add(getQuestionDataFromResources(type, questionResId, optionsResId, answersResId, resources))
+//            for (i in 0 until questionIds.length()) {
+//                val questionResId = questionIds.getResourceId(i, 0)
+//                val optionsResId = resources.getIdentifier("question_${i+1}_options", "array", packageName)
+//                val answersResId = resources.getIdentifier("question_${i+1}_answers", "array", packageName)
+//                val type = if (resources.getStringArray(answersResId).size > 1) QuestionType.CHECKBOX else QuestionType.RADIO
+//                questionsData.add(getQuestionDataFromResources(type, questionResId, optionsResId, answersResId, resources))
+//            }
+//
+//            questionIds.recycle() // Remember to recycle the typed array
+
+            // Initialize Retrofit and fetch the data
+            val retrofit = Retrofit.Builder()
+                .baseUrl("https://quizbackend-eb9e6c188220.herokuapp.com/")
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+
+
+            val api = retrofit.create(QuizApi::class.java)
+
+            val questionsData = remember { mutableStateListOf<QuestionData>() }
+
+            // Fetch the data asynchronously in the background
+            LaunchedEffect(Unit) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val response = api.getQuestions()
+                        withContext(Dispatchers.Main) {
+                            response.forEach { questionResponse ->
+                                val type =
+                                    if (questionResponse.answer.size > 1) QuestionType.CHECKBOX else QuestionType.RADIO
+                                val correctAnswers = questionResponse.answer.map { it.toString() }
+                                questionsData.add(
+                                    QuestionData(
+                                        type,
+                                        questionResponse.prompt,
+                                        questionResponse.choices,
+                                        correctAnswers
+                                    )
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Handle the exception, e.g., show a Snackbar or a Toast
+                        e.printStackTrace()
+                    }
+                }
             }
 
-            questionIds.recycle() // Remember to recycle the typed array
             Box(modifier = Modifier.fillMaxSize()) { // Add the Box here
 
                 if (showIntroPage.value) {
@@ -204,7 +242,7 @@ class MainActivity : ComponentActivity() {
         onQuizFinished: () -> Unit,
         snackbarState: MutableState<SnackbarData?>  // Passed state to use in the function
     ) {
-        val context = LocalContext.current
+//        val context = LocalContext.current
         val currentQuestionIndex = remember { mutableStateOf(0) }
 
         if (currentQuestionIndex.value < questions.size) {
@@ -213,13 +251,13 @@ class MainActivity : ComponentActivity() {
                 QuestionType.RADIO -> RadioButtonQuestionWrapper(
                     data = questionData,
                     onAnswered = { isCorrect ->
-                        handleAnswer(isCorrect, score, currentQuestionIndex, context, snackbarState)
+                        handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState)
                     }
                 )
                 QuestionType.CHECKBOX -> CheckboxQuestionWrapper(
                     data = questionData,
                     onAnswered = { isCorrect ->
-                        handleAnswer(isCorrect, score, currentQuestionIndex, context, snackbarState)
+                        handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState)
                     }
                 )
             }
@@ -237,7 +275,6 @@ class MainActivity : ComponentActivity() {
         isCorrect: Boolean,
         score: MutableState<Int>,
         currentQuestionIndex: MutableState<Int>,
-        context: Context,
         snackbarState: MutableState<SnackbarData?>  // Passed state to use in the function
     ) {
         val feedbackMessage = if (isCorrect) {
@@ -260,11 +297,11 @@ class MainActivity : ComponentActivity() {
         data: QuestionData,
         onAnswered: (Boolean) -> Unit
     ) {
-        val question = stringResource(id = data.questionResId)
-        val options = stringArrayResource(id = data.optionsResId).toList()
+        val question = data.question
+        val options = data.choices
         val correctAnswers = data.correctAnswers
         val selectedOption = remember { mutableStateOf<String?>(null) }
-        val context = LocalContext.current
+//        val context = LocalContext.current
 
         RadioButtonQuestionTemplate(
             question = question,
@@ -282,12 +319,12 @@ class MainActivity : ComponentActivity() {
         data: QuestionData,
         onAnswered: (Boolean) -> Unit
     ) {
-        val question = stringResource(id = data.questionResId)
-        val options = stringArrayResource(id = data.optionsResId).toList()
+        val question = data.question
+        val options = data.choices
         val correctAnswers = data.correctAnswers
 
         val selectedOptions = remember { mutableStateOf<List<String>>(emptyList()) }
-        val context = LocalContext.current
+//        val context = LocalContext.current
 
         CheckboxQuestionTemplate(
             question = question,
@@ -298,16 +335,5 @@ class MainActivity : ComponentActivity() {
             },
             selectedOptions = selectedOptions
         )
-    }
-
-    fun getQuestionDataFromResources(
-        type: QuestionType,
-        questionResId: Int,
-        optionsResId: Int,
-        correctAnswersResId: Int,
-        resources: Resources
-    ): QuestionData {
-        val correctAnswers = resources.getStringArray(correctAnswersResId).toList()
-        return QuestionData(type, questionResId, optionsResId, correctAnswers)
     }
 }
