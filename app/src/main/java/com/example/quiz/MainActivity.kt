@@ -12,20 +12,25 @@ import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +45,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.withContext
@@ -52,7 +58,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val snackbarState = remember { mutableStateOf<SnackbarData?>(null) }
-            val showIntroPage = remember { mutableStateOf(true) }
+            val currentScreen: MutableState<Screen> = remember { mutableStateOf(Screen.Intro) }
             val currentRound = remember { mutableStateOf(1) }
             val score = remember { mutableStateOf(0) }
 //            val resources = LocalContext.current.resources
@@ -109,28 +115,13 @@ class MainActivity : ComponentActivity() {
             }
 
             Box(modifier = Modifier.fillMaxSize()) { // Add the Box here
-
-                if (showIntroPage.value) {
-                    IntroPage(onStartQuiz = {
-                        showIntroPage.value = false
-                    })
-                } else {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        DisplayQuestions(
-                            questions = questionsData,
-                            currentRound = currentRound,
-                            score = score,
-                            onQuizFinished = {
-                                showIntroPage.value = true
-                            },
-                            snackbarState = snackbarState
-                        )
-                    }
-                }
-
-
+                Navigation(
+                    currentScreen = currentScreen,
+                    questionsData = questionsData,
+                    currentRound = currentRound,
+                    score = score,
+                    snackbarState = snackbarState
+                ) // Use the Navigation composable here
                 snackbarState.value?.let { snackbarData ->
                     // Snackbar display
                     val screenHeight = LocalConfiguration.current.screenHeightDp
@@ -161,6 +152,58 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    @Composable
+    fun Navigation(
+        currentScreen: MutableState<Screen>,
+        questionsData: MutableList<QuestionData>,
+        currentRound: MutableState<Int>,
+        score: MutableState<Int>,
+        snackbarState: MutableState<SnackbarData?>
+    ) {
+        when (val screen = currentScreen.value) {
+            is Screen.Intro -> IntroPage(onStartQuiz = { currentScreen.value = Screen.Quiz })
+            is Screen.Login -> LoginScreen(onLoginSuccess = { currentScreen.value = Screen.Intro })
+            is Screen.Registration -> RegistrationScreen(onRegistrationSuccess = { currentScreen.value = Screen.Intro })
+            is Screen.Quiz -> QuizScreen(
+                questionsData = questionsData,
+                currentRound = currentRound,
+                score = score,
+                snackbarState = snackbarState,
+                onQuizFinished = { currentScreen.value = Screen.Intro }
+            )
+        }
+    }
+
+    @Composable
+    fun QuizScreen(
+        questionsData: MutableList<QuestionData>,
+        currentRound: MutableState<Int>,
+        score: MutableState<Int>,
+        snackbarState: MutableState<SnackbarData?>,
+        onQuizFinished: () -> Unit
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            DisplayQuestions(
+                questions = questionsData,
+                currentRound = currentRound,
+                score = score,
+                onQuizFinished = onQuizFinished,
+                snackbarState = snackbarState
+            )
+        }
+    }
+
+    private @Composable
+    fun RegistrationScreen(onRegistrationSuccess: () -> Unit) {
+        TODO("Not yet implemented")
+    }
+
+    private @Composable
+    fun LoginScreen(onLoginSuccess: () -> Unit) {
+        TODO("Not yet implemented")
+    }
+
 
     fun SnackbarDuration.toMillis(): Long {
         return when (this) {
@@ -334,5 +377,63 @@ class MainActivity : ComponentActivity() {
             },
             selectedOptions = selectedOptionsIndices
         )
+    }
+
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun RegistrationLoginUI(onLoginSuccessful: () -> Unit, onRegisterSuccessful: () -> Unit) {
+        val username = remember { mutableStateOf("") }
+        val password = remember { mutableStateOf("") }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxSize().padding(16.dp)
+        ) {
+            // Username Input
+            TextField(
+                value = username.value,
+                onValueChange = { username.value = it },
+                label = { Text("Username") },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            )
+
+            // Password Input
+            TextField(
+                value = password.value,
+                onValueChange = { password.value = it },
+                label = { Text("Password") },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                visualTransformation = PasswordVisualTransformation()
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Registration Button
+                Button(onClick = {
+                    // TODO: Handle registration logic
+                    onRegisterSuccessful()
+                }) {
+                    Text("Register")
+                }
+
+                // Login Button
+                Button(onClick = {
+                    // TODO: Handle login logic
+                    onLoginSuccessful()
+                }) {
+                    Text("Login")
+                }
+            }
+        }
+    }
+
+
+
+    enum class AppScreen {
+        REGISTRATION_LOGIN, INTRO, QUIZ
     }
 }
