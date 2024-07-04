@@ -1,11 +1,5 @@
 package com.example.quiz
 
-import android.content.Context
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import android.content.res.Resources
 import android.net.Uri
 import android.os.Bundle
 import android.widget.VideoView
@@ -46,16 +40,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringArrayResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.quiz.network.RetrofitClient
+import com.example.quiz.network.ScoreData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 class MainActivity : ComponentActivity() {
+
+    // This should be set by each user
+    private val userName = "YourNameHere"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -136,6 +137,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private suspend fun submitScore(score: Int) {
+        val scoreData = ScoreData(user = userName, score = score, date = "")
+        try {
+            val response = RetrofitClient.instance.submitScore(scoreData)
+            // Handle successful submission
+            println("Score submitted successfully: $response")
+        } catch (e: Exception) {
+            // Handle error
+            e.printStackTrace()
+            println("Error submitting score: ${e.message}")
+        }
+    }
+
     @Composable
     fun Navigation(
         currentScreen: MutableState<Screen>,
@@ -155,6 +169,10 @@ class MainActivity : ComponentActivity() {
                 score = score,
                 snackbarState = snackbarState,
                 onQuizFinished = {
+                    // Submit the score when the quiz is finished
+                    CoroutineScope(Dispatchers.IO).launch {
+                        submitScore(score.value)
+                    }
                     currentScreen.value = Screen.Score(currentRound.value, score.value)
                 }
             )
@@ -492,4 +510,7 @@ class MainActivity : ComponentActivity() {
     enum class QuestionType {
         RADIO, CHECKBOX
     }
+
+
+
 }
