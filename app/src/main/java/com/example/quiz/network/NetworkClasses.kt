@@ -16,7 +16,7 @@ interface QuizApi {
 
 
 object RetrofitClient {
-    private const val BASE_URL = "https://your-heroku-app.herokuapp.com"
+    private const val BASE_URL = "https://quizappcl-a7d35f534d01.herokuapp.com/"
 
     val instance: QuizApi by lazy {
         val retrofit = Retrofit.Builder()

@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,9 +24,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Text
@@ -61,32 +64,12 @@ class MainActivity : ComponentActivity() {
             val currentScreen: MutableState<Screen> = remember { mutableStateOf(Screen.Intro) }
             val currentRound = remember { mutableStateOf(1) }
             val score = remember { mutableStateOf(0) }
-//            val resources = LocalContext.current.resources
-            // Fetch the list of questions
-//            val questionIds = resources.obtainTypedArray(R.array.questions_list)
-//            val questionsData = mutableListOf<QuestionData>()
-            // Dynamically create QuestionData for each question
-//            for (i in 0 until questionIds.length()) {
-//                val questionResId = questionIds.getResourceId(i, 0)
-//                val optionsResId = resources.getIdentifier("question_${i+1}_options", "array", packageName)
-//                val answersResId = resources.getIdentifier("question_${i+1}_answers", "array", packageName)
-//                val type = if (resources.getStringArray(answersResId).size > 1) QuestionType.CHECKBOX else QuestionType.RADIO
-//                questionsData.add(getQuestionDataFromResources(type, questionResId, optionsResId, answersResId, resources))
-//            }
-//
-//            questionIds.recycle() // Remember to recycle the typed array
-
-            // Initialize Retrofit and fetch the data
             val retrofit = Retrofit.Builder()
-                .baseUrl("https://quizbackend-eb9e6c188220.herokuapp.com/")
+                .baseUrl("https://quizappcl-a7d35f534d01.herokuapp.com/")
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
-
-
             val api = retrofit.create(QuizApi::class.java)
-
             val questionsData = remember { mutableStateListOf<QuestionData>() }
-
             // Fetch the data asynchronously in the background
             LaunchedEffect(Unit) {
                 withContext(Dispatchers.IO) {
@@ -129,9 +112,9 @@ class MainActivity : ComponentActivity() {
                     Snackbar(
                         modifier = Modifier.align(Alignment.BottomCenter)  // Align to bottom center
                             .offset(y = -offsetValue) // Move upwards by the offset
-                        .padding(horizontal = 32.dp),  // Add horizontal padding
+                            .padding(horizontal = 32.dp),  // Add horizontal padding
 
-                    action = {
+                        action = {
                             TextButton(onClick = { snackbarState.value = null }) {
                                 Text("DISMISS")
                             }
@@ -183,7 +166,19 @@ class MainActivity : ComponentActivity() {
         snackbarState: MutableState<SnackbarData?>,
         onQuizFinished: () -> Unit
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFEDEDED))
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Quiz Round ${currentRound.value}",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
             DisplayQuestions(
                 questions = questionsData,
                 currentRound = currentRound,
@@ -204,7 +199,6 @@ class MainActivity : ComponentActivity() {
         TODO("Not yet implemented")
     }
 
-
     fun SnackbarDuration.toMillis(): Long {
         return when (this) {
             SnackbarDuration.Short -> 1500L
@@ -212,8 +206,6 @@ class MainActivity : ComponentActivity() {
             SnackbarDuration.Indefinite -> Long.MAX_VALUE // Represents an indefinitely long duration.
         }
     }
-
-
 
     @Composable
     fun IntroPage(onStartQuiz: () -> Unit) {
@@ -266,16 +258,14 @@ class MainActivity : ComponentActivity() {
                 Button(
                     onClick = onStartQuiz,
                     modifier = Modifier.size(buttonWidth, buttonHeight).align(Alignment.Center).background(Color.Transparent),
-                    colors = ButtonDefaults.buttonColors(Color.Transparent)
+                    colors = ButtonDefaults.buttonColors(Color.Transparent),
+                    contentPadding = PaddingValues(0.dp) // This is optional, but can help in ensuring the button remains completely transparent
                 ) {
                     Text("Start Quiz")
                 }
             }
         }
     }
-
-
-
 
     @Composable
     fun DisplayQuestions(
@@ -285,26 +275,37 @@ class MainActivity : ComponentActivity() {
         onQuizFinished: () -> Unit,
         snackbarState: MutableState<SnackbarData?>  // Passed state to use in the function
     ) {
-//        val context = LocalContext.current
         val currentQuestionIndex = remember { mutableStateOf(0) }
 
         if (currentQuestionIndex.value < questions.size) {
             val questionData = questions[currentQuestionIndex.value]
-            when (questionData.type) {
-                QuestionType.RADIO -> RadioButtonQuestionWrapper(
-                    data = questionData,
-                    onAnswered = { isCorrect ->
-                        handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState)
-                    }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, shape = RoundedCornerShape(8.dp))
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = questionData.question,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
-                QuestionType.CHECKBOX -> CheckboxQuestionWrapper(
-                    data = questionData,
-                    onAnswered = { isCorrect ->
-                        handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState)
-                    }
-                )
+                when (questionData.type) {
+                    QuestionType.RADIO -> RadioButtonQuestionWrapper(
+                        data = questionData,
+                        onAnswered = { isCorrect ->
+                            handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState)
+                        }
+                    )
+                    QuestionType.CHECKBOX -> CheckboxQuestionWrapper(
+                        data = questionData,
+                        onAnswered = { isCorrect ->
+                            handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState)
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
             }
-            Spacer(modifier = Modifier.height(24.dp))
         } else {
             // Round finished, reset questions and increase round number.
             currentRound.value += 1
@@ -333,7 +334,6 @@ class MainActivity : ComponentActivity() {
             currentQuestionIndex.value += 1
         }
     }
-
 
     @Composable
     fun RadioButtonQuestionWrapper(
@@ -367,7 +367,7 @@ class MainActivity : ComponentActivity() {
         val options = data.choices
         val correctAnswersInt = data.correctAnswers.map { it.toInt() } // Convert to list of integers
         // Using data.question as a key for remember
-            val selectedOptionsIndices = remember(data.choices + data.question) { mutableStateOf<List<Int>>(emptyList()) }
+        val selectedOptionsIndices = remember(data.choices + data.question) { mutableStateOf<List<Int>>(emptyList()) }
         CheckboxQuestionTemplate(
             question = question,
             options = options,
@@ -378,7 +378,6 @@ class MainActivity : ComponentActivity() {
             selectedOptions = selectedOptionsIndices
         )
     }
-
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -430,8 +429,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-
 
     enum class AppScreen {
         REGISTRATION_LOGIN, INTRO, QUIZ
