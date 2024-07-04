@@ -145,16 +145,29 @@ class MainActivity : ComponentActivity() {
         snackbarState: MutableState<SnackbarData?>
     ) {
         when (val screen = currentScreen.value) {
-            is Screen.Intro -> IntroPage(onStartQuiz = { currentScreen.value = Screen.Quiz })
-            is Screen.Login -> LoginScreen(onLoginSuccess = { currentScreen.value = Screen.Intro })
-            is Screen.Registration -> RegistrationScreen(onRegistrationSuccess = { currentScreen.value = Screen.Intro })
+            is Screen.Intro -> IntroPage(onStartQuiz = {
+                score.value = 0 // Reset score for new round
+                currentScreen.value = Screen.Quiz
+            })
             is Screen.Quiz -> QuizScreen(
                 questionsData = questionsData,
                 currentRound = currentRound,
                 score = score,
                 snackbarState = snackbarState,
-                onQuizFinished = { currentScreen.value = Screen.Intro }
+                onQuizFinished = {
+                    currentScreen.value = Screen.Score(currentRound.value, score.value)
+                }
             )
+            is Screen.Score -> ScoreScreen(
+                round = screen.round,
+                score = screen.score,
+                onContinue = {
+                    currentRound.value += 1 // Increment the round when continuing to the next round
+                    currentScreen.value = Screen.Intro
+                }
+            )
+
+            else -> {}
         }
     }
 
@@ -287,7 +300,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 Text(
                     text = questionData.question,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 when (questionData.type) {
@@ -308,9 +321,6 @@ class MainActivity : ComponentActivity() {
             }
         } else {
             // Round finished, reset questions and increase round number.
-            currentRound.value += 1
-            currentQuestionIndex.value = 0
-            snackbarState.value = SnackbarData(message = "Round finished!")
             onQuizFinished()
         }
     }
@@ -379,6 +389,36 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    @Composable
+    fun ScoreScreen(round: Int, score: Int, onContinue: () -> Unit) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFEDEDED))
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Round $round Score",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                Text(
+                    text = "You scored $score points!",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 32.dp)
+                )
+                Button(onClick = onContinue) {
+                    Text("Continue")
+                }
+            }
+        }
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun RegistrationLoginUI(onLoginSuccessful: () -> Unit, onRegisterSuccessful: () -> Unit) {
@@ -430,7 +470,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    enum class AppScreen {
-        REGISTRATION_LOGIN, INTRO, QUIZ
+    sealed class Screen {
+        object RegistrationLogin : Screen()
+        object Intro : Screen()
+        object Quiz : Screen()
+        data class Score(val round: Int, val score: Int) : Screen()
+    }
+
+    data class SnackbarData(
+        val message: String,
+        val duration: SnackbarDuration = SnackbarDuration.Short
+    )
+
+    data class QuestionData(
+        val type: QuestionType,
+        val question: String,
+        val choices: List<String>,
+        val correctAnswers: List<String>
+    )
+
+    enum class QuestionType {
+        RADIO, CHECKBOX
     }
 }
