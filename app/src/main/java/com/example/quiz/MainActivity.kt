@@ -18,9 +18,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
@@ -56,7 +60,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 class MainActivity : ComponentActivity() {
 
     // This should be set by each user
-    private val userName = "YourNameHere"
+    private val userName = "DMalonas"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,23 +102,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            Box(modifier = Modifier.fillMaxSize()) { // Add the Box here
+            Box(modifier = Modifier.fillMaxSize()) {
                 Navigation(
                     currentScreen = currentScreen,
                     questionsData = questionsData,
                     currentRound = currentRound,
                     score = score,
                     snackbarState = snackbarState
-                ) // Use the Navigation composable here
+                )
                 snackbarState.value?.let { snackbarData ->
-                    // Snackbar display
                     val screenHeight = LocalConfiguration.current.screenHeightDp
                     val offsetValue = (screenHeight / 4).dp
                     Snackbar(
-                        modifier = Modifier.align(Alignment.BottomCenter)  // Align to bottom center
-                            .offset(y = -offsetValue) // Move upwards by the offset
-                            .padding(horizontal = 32.dp),  // Add horizontal padding
-
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                            .offset(y = -offsetValue)
+                            .padding(horizontal = 32.dp),
                         action = {
                             TextButton(onClick = { snackbarState.value = null }) {
                                 Text("DISMISS")
@@ -124,7 +126,6 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(snackbarData.message)
                     }
-                    // Set a delay to auto-dismiss the Snackbar after a certain duration
                     CoroutineScope(Dispatchers.Main).launch {
                         val delayDuration = snackbarData.duration.toMillis()
                         if (snackbarData.duration != SnackbarDuration.Indefinite) {
@@ -141,10 +142,8 @@ class MainActivity : ComponentActivity() {
         val scoreData = ScoreData(user = userName, score = score, date = "")
         try {
             val response = RetrofitClient.instance.submitScore(scoreData)
-            // Handle successful submission
             println("Score submitted successfully: $response")
         } catch (e: Exception) {
-            // Handle error
             e.printStackTrace()
             println("Error submitting score: ${e.message}")
         }
@@ -159,20 +158,21 @@ class MainActivity : ComponentActivity() {
         snackbarState: MutableState<SnackbarData?>
     ) {
         when (val screen = currentScreen.value) {
-            is Screen.Intro -> IntroPage(onStartQuiz = {
-                score.value = 0 // Reset score for new round
-                currentScreen.value = Screen.Quiz
-            })
+            is Screen.Intro -> IntroPage(
+                onStartQuiz = {
+                    score.value = 0
+                    currentScreen.value = Screen.Quiz
+                },
+                onViewScores = {
+                    currentScreen.value = Screen.Scores
+                }
+            )
             is Screen.Quiz -> QuizScreen(
                 questionsData = questionsData,
                 currentRound = currentRound,
                 score = score,
                 snackbarState = snackbarState,
                 onQuizFinished = {
-                    // Submit the score when the quiz is finished
-                    CoroutineScope(Dispatchers.IO).launch {
-                        submitScore(score.value)
-                    }
                     currentScreen.value = Screen.Score(currentRound.value, score.value)
                 }
             )
@@ -180,11 +180,18 @@ class MainActivity : ComponentActivity() {
                 round = screen.round,
                 score = screen.score,
                 onContinue = {
-                    currentRound.value += 1 // Increment the round when continuing to the next round
+                    CoroutineScope(Dispatchers.IO).launch {
+                        submitScore(screen.score)
+                    }
+                    currentRound.value += 1
                     currentScreen.value = Screen.Intro
                 }
             )
-
+            is Screen.Scores -> ScoresScreen(
+                onBack = {
+                    currentScreen.value = Screen.Intro
+                }
+            )
             else -> {}
         }
     }
@@ -234,18 +241,17 @@ class MainActivity : ComponentActivity() {
         return when (this) {
             SnackbarDuration.Short -> 1500L
             SnackbarDuration.Long -> 2750L
-            SnackbarDuration.Indefinite -> Long.MAX_VALUE // Represents an indefinitely long duration.
+            SnackbarDuration.Indefinite -> Long.MAX_VALUE
         }
     }
 
     @Composable
-    fun IntroPage(onStartQuiz: () -> Unit) {
+    fun IntroPage(onStartQuiz: () -> Unit, onViewScores: () -> Unit) {
         val context = LocalContext.current
 
         val backgroundVideoView = remember { VideoView(context) }
         val buttonTextureVideoView = remember { VideoView(context) }
 
-        // Setting up background video
         DisposableEffect(Unit) {
             backgroundVideoView.setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.intro_video}"))
             backgroundVideoView.setOnPreparedListener { mediaPlayer ->
@@ -258,7 +264,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Setting up button texture video
         DisposableEffect(Unit) {
             buttonTextureVideoView.setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.patterns}"))
             buttonTextureVideoView.setOnPreparedListener { mediaPlayer ->
@@ -275,24 +280,33 @@ class MainActivity : ComponentActivity() {
         val buttonHeight = 60.dp
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // Background VideoView
             AndroidView({ backgroundVideoView }, Modifier.fillMaxSize())
 
-            // Centered Box for button video texture and button
-            Box(
-                modifier = Modifier.align(Alignment.Center)
-            ) {
-                // Button Texture VideoView
+            Box(modifier = Modifier.align(Alignment.Center)) {
                 AndroidView({ buttonTextureVideoView }, Modifier.size(buttonWidth, buttonHeight).align(Alignment.Center))
 
-                // Actual Button with transparent background
-                Button(
-                    onClick = onStartQuiz,
-                    modifier = Modifier.size(buttonWidth, buttonHeight).align(Alignment.Center).background(Color.Transparent),
-                    colors = ButtonDefaults.buttonColors(Color.Transparent),
-                    contentPadding = PaddingValues(0.dp) // This is optional, but can help in ensuring the button remains completely transparent
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.align(Alignment.Center)
                 ) {
-                    Text("Start Quiz")
+                    Button(
+                        onClick = onStartQuiz,
+                        modifier = Modifier.size(buttonWidth, buttonHeight).background(Color.Transparent),
+                        colors = ButtonDefaults.buttonColors(Color.Transparent),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("Start Quiz")
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = onViewScores,
+                        modifier = Modifier.size(buttonWidth, buttonHeight).background(Color.Transparent),
+                        colors = ButtonDefaults.buttonColors(Color.Transparent),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("View Scores")
+                    }
                 }
             }
         }
@@ -304,7 +318,7 @@ class MainActivity : ComponentActivity() {
         currentRound: MutableState<Int>,
         score: MutableState<Int>,
         onQuizFinished: () -> Unit,
-        snackbarState: MutableState<SnackbarData?>  // Passed state to use in the function
+        snackbarState: MutableState<SnackbarData?>
     ) {
         val currentQuestionIndex = remember { mutableStateOf(0) }
 
@@ -338,7 +352,6 @@ class MainActivity : ComponentActivity() {
                 Spacer(modifier = Modifier.height(24.dp))
             }
         } else {
-            // Round finished, reset questions and increase round number.
             onQuizFinished()
         }
     }
@@ -347,7 +360,7 @@ class MainActivity : ComponentActivity() {
         isCorrect: Boolean,
         score: MutableState<Int>,
         currentQuestionIndex: MutableState<Int>,
-        snackbarState: MutableState<SnackbarData?>  // Passed state to use in the function
+        snackbarState: MutableState<SnackbarData?>
     ) {
         val feedbackMessage = if (isCorrect) {
             score.value += 1
@@ -358,7 +371,7 @@ class MainActivity : ComponentActivity() {
         snackbarState.value = SnackbarData(message = feedbackMessage, SnackbarDuration.Short)
 
         CoroutineScope(Dispatchers.Main).launch {
-            delay(1000)  // 1 second delay
+            delay(1000)
             currentQuestionIndex.value += 1
         }
     }
@@ -372,7 +385,6 @@ class MainActivity : ComponentActivity() {
         val options = data.choices
         val correctAnswersInt = data.correctAnswers.map { it.toInt() }
 
-        // Use data.id as a unique key for the state
         val selectedOption = remember(data.choices + data.question) { mutableStateOf<Int?>(null) }
 
         RadioButtonQuestionTemplate(
@@ -393,8 +405,7 @@ class MainActivity : ComponentActivity() {
     ) {
         val question = data.question
         val options = data.choices
-        val correctAnswersInt = data.correctAnswers.map { it.toInt() } // Convert to list of integers
-        // Using data.question as a key for remember
+        val correctAnswersInt = data.correctAnswers.map { it.toInt() }
         val selectedOptionsIndices = remember(data.choices + data.question) { mutableStateOf<List<Int>>(emptyList()) }
         CheckboxQuestionTemplate(
             question = question,
@@ -448,7 +459,6 @@ class MainActivity : ComponentActivity() {
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxSize().padding(16.dp)
         ) {
-            // Username Input
             TextField(
                 value = username.value,
                 onValueChange = { username.value = it },
@@ -456,7 +466,6 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
             )
 
-            // Password Input
             TextField(
                 value = password.value,
                 onValueChange = { password.value = it },
@@ -469,17 +478,13 @@ class MainActivity : ComponentActivity() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Registration Button
                 Button(onClick = {
-                    // TODO: Handle registration logic
                     onRegisterSuccessful()
                 }) {
                     Text("Register")
                 }
 
-                // Login Button
                 Button(onClick = {
-                    // TODO: Handle login logic
                     onLoginSuccessful()
                 }) {
                     Text("Login")
@@ -493,6 +498,7 @@ class MainActivity : ComponentActivity() {
         object Intro : Screen()
         object Quiz : Screen()
         data class Score(val round: Int, val score: Int) : Screen()
+        object Scores : Screen()
     }
 
     data class SnackbarData(
@@ -511,6 +517,79 @@ class MainActivity : ComponentActivity() {
         RADIO, CHECKBOX
     }
 
+    @Composable
+    fun ScoresScreen(onBack: () -> Unit) {
+        val scores = remember { mutableStateOf<List<ScoreData>>(emptyList()) }
+        val aggregateScores = remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+        val totalRounds = remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
 
+        LaunchedEffect(Unit) {
+            fetchScores { fetchedScores ->
+                scores.value = fetchedScores
+                aggregateScores.value = fetchedScores.groupBy { it.user }
+                    .mapValues { entry -> entry.value.sumOf { it.score } }
+                totalRounds.value = fetchedScores.groupBy { it.user }
+                    .mapValues { entry -> entry.value.size }
+            }
+        }
 
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
+        ) {
+            Text(text = "Scoreboard", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 16.dp))
+
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(aggregateScores.value.toList()) { (user, totalScore) ->
+                    val rounds = totalRounds.value[user] ?: 0
+                    ScoreCard(user = user, rounds = rounds, score = totalScore)
+                }
+            }
+
+            Button(
+                onClick = onBack,
+                modifier = Modifier.padding(top = 16.dp)
+            ) {
+                Text("Back")
+            }
+        }    }
+
+    @Composable
+    fun ScoreCard(user: String, rounds: Int, score: Int) {
+        Card(
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            elevation = CardDefaults.cardElevation(4.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
+            ) {
+                Text(text = user, style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Total Rounds: $rounds", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = "Total Score: $score", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+
+    private fun fetchScores(onResult: (List<ScoreData>) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val scores = RetrofitClient.instance.getScores()
+                withContext(Dispatchers.Main) {
+                    onResult(scores)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 }
