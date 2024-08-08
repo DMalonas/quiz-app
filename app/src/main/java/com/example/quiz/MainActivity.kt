@@ -204,6 +204,9 @@ class MainActivity : ComponentActivity() {
         snackbarState: MutableState<SnackbarData?>,
         onQuizFinished: () -> Unit
     ) {
+        val currentQuestionIndex = remember { mutableStateOf(0) }
+        val answeredQuestions = remember { mutableStateOf(0) }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -219,14 +222,24 @@ class MainActivity : ComponentActivity() {
             )
             DisplayQuestions(
                 questions = questionsData,
-                currentRound = currentRound,
+                currentQuestionIndex = currentQuestionIndex,
                 score = score,
-                onQuizFinished = onQuizFinished,
-                snackbarState = snackbarState
+                snackbarState = snackbarState,
+                onAnswered = {
+                    answeredQuestions.value += 1
+                }
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(onClick = {
+                // Call onQuizFinished() to handle partial submission
+                onQuizFinished()
+            }) {
+                Text("Submit Quiz")
+            }
         }
     }
-
     private @Composable
     fun RegistrationScreen(onRegistrationSuccess: () -> Unit) {
         TODO("Not yet implemented")
@@ -315,13 +328,11 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun DisplayQuestions(
         questions: List<QuestionData>,
-        currentRound: MutableState<Int>,
+        currentQuestionIndex: MutableState<Int>,
         score: MutableState<Int>,
-        onQuizFinished: () -> Unit,
-        snackbarState: MutableState<SnackbarData?>
+        snackbarState: MutableState<SnackbarData?>,
+        onAnswered: () -> Unit
     ) {
-        val currentQuestionIndex = remember { mutableStateOf(0) }
-
         if (currentQuestionIndex.value < questions.size) {
             val questionData = questions[currentQuestionIndex.value]
             Column(
@@ -339,28 +350,26 @@ class MainActivity : ComponentActivity() {
                     QuestionType.RADIO -> RadioButtonQuestionWrapper(
                         data = questionData,
                         onAnswered = { isCorrect ->
-                            handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState)
+                            handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState, onAnswered)
                         }
                     )
                     QuestionType.CHECKBOX -> CheckboxQuestionWrapper(
                         data = questionData,
                         onAnswered = { isCorrect ->
-                            handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState)
+                            handleAnswer(isCorrect, score, currentQuestionIndex, snackbarState, onAnswered)
                         }
                     )
                 }
                 Spacer(modifier = Modifier.height(24.dp))
             }
-        } else {
-            onQuizFinished()
         }
     }
-
     fun handleAnswer(
         isCorrect: Boolean,
         score: MutableState<Int>,
         currentQuestionIndex: MutableState<Int>,
-        snackbarState: MutableState<SnackbarData?>
+        snackbarState: MutableState<SnackbarData?>,
+        onAnswered: () -> Unit
     ) {
         val feedbackMessage = if (isCorrect) {
             score.value += 1
@@ -370,12 +379,13 @@ class MainActivity : ComponentActivity() {
         }
         snackbarState.value = SnackbarData(message = feedbackMessage, SnackbarDuration.Short)
 
+        onAnswered()
+
         CoroutineScope(Dispatchers.Main).launch {
             delay(1000)
             currentQuestionIndex.value += 1
         }
     }
-
     @Composable
     fun RadioButtonQuestionWrapper(
         data: QuestionData,
@@ -447,7 +457,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun RegistrationLoginUI(onLoginSuccessful: () -> Unit, onRegisterSuccessful: () -> Unit) {
