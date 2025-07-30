@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">quiz</string>
+
+    <!-- List of Questions -->
+    <array name="questions_list">
+        <item>@string/question_1</item>
+        <item>@string/question_2</item>
+    </array>
+
+    <!-- Individual Questions -->
+    <string name="question_1">What\'s the capital of Australia?</string>
+    <string name="question_2">Which of these are programming languages?</string>
+
+    <!-- Options for the questions -->
+    <string-array name="question_1_options">
+        <item>Canberra</item>
+        <item>Sydney</item>
+        <item>Melbourne</item>
+    </string-array>
+    <string-array name="question_2_options">
+        <item>Python</item>
+        <item>C++</item>
+        <item>Java</item>
+        <item>Pencil</item>
+    </string-array>
+
+    <!-- Correct answers for the questions -->
+    <string-array name="question_1_answers">
+        <item>Canberra</item>
+    </string-array>
+    <string-array name="question_2_answers">
+        <item>Python</item>
+        <item>C++</item>
+        <item>Java</item>
+    </string-array>
+</resources>
